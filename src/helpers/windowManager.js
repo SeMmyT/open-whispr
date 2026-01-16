@@ -115,9 +115,7 @@ class WindowManager {
       }
       lastToggleTime = now;
 
-      if (!this.mainWindow.isVisible()) {
-        this.mainWindow.show();
-      }
+      // Don't auto-show window here - renderer will handle via IPC when recording starts
       this.mainWindow.webContents.send("toggle-dictation");
     };
   }
@@ -277,6 +275,27 @@ class WindowManager {
     }
   }
 
+  // Show the recording indicator (iOS-style pill at bottom center)
+  showRecordingIndicator() {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      if (!this.mainWindow.isVisible()) {
+        if (typeof this.mainWindow.showInactive === "function") {
+          this.mainWindow.showInactive();
+        } else {
+          this.mainWindow.show();
+        }
+      }
+      this.enforceMainWindowOnTop();
+    }
+  }
+
+  // Hide the recording indicator
+  hideRecordingIndicator() {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.hide();
+    }
+  }
+
   isDictationPanelVisible() {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return false;
@@ -295,14 +314,8 @@ class WindowManager {
     }
 
     this.mainWindow.once("ready-to-show", () => {
+      // Don't auto-show - window stays hidden until recording starts (iOS-style indicator)
       this.enforceMainWindowOnTop();
-      if (!this.mainWindow.isVisible()) {
-        if (typeof this.mainWindow.showInactive === "function") {
-          this.mainWindow.showInactive();
-        } else {
-          this.mainWindow.show();
-        }
-      }
     });
 
     this.mainWindow.on("show", () => {

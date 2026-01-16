@@ -26,6 +26,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   pasteText: (text) => ipcRenderer.invoke("paste-text", text),
   hideWindow: () => ipcRenderer.invoke("hide-window"),
   showDictationPanel: () => ipcRenderer.invoke("show-dictation-panel"),
+
+  // Recording indicator show/hide (iOS-style pill)
+  showRecordingIndicator: () => ipcRenderer.invoke("show-recording-indicator"),
+  hideRecordingIndicator: () => ipcRenderer.invoke("hide-recording-indicator"),
   onToggleDictation: registerListener(
     "toggle-dictation",
     (callback) => () => callback()

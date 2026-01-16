@@ -1,9 +1,9 @@
 const path = require("path");
 
-// Main dictation window configuration
+// Main dictation window configuration (iOS-style pill indicator)
 const MAIN_WINDOW_CONFIG = {
   width: 240,
-  height: 240,
+  height: 60,
   title: "Voice Recorder",
   webPreferences: {
     preload: path.join(__dirname, "..", "..", "preload.js"),
@@ -16,7 +16,7 @@ const MAIN_WINDOW_CONFIG = {
   alwaysOnTop: true,
   resizable: false,
   transparent: true,
-  show: false, // Start hidden, show after setup
+  show: false, // Start hidden, only show when recording/processing
   skipTaskbar: false, // Keep visible in Dock/taskbar so app stays discoverable
   focusable: true,
   visibleOnAllWorkspaces: process.platform !== "win32",
@@ -64,8 +64,9 @@ class WindowPositionUtil {
   static getMainWindowPosition(display) {
     const { width, height } = MAIN_WINDOW_CONFIG;
     const MARGIN = 20;
-    const x = Math.max(0, display.bounds.x + display.workArea.width - width - MARGIN);
     const workArea = display.workArea || display.bounds;
+    // Center horizontally at bottom of screen (iOS Dynamic Island style)
+    const x = Math.round(workArea.x + (workArea.width - width) / 2);
     const y = Math.max(0, workArea.y + workArea.height - height - MARGIN);
     return { x, y, width, height };
   }

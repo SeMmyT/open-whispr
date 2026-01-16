@@ -61,6 +61,15 @@ class IPCHandlers {
       this.windowManager.showDictationPanel();
     });
 
+    // Recording indicator show/hide (iOS-style pill)
+    ipcMain.handle("show-recording-indicator", () => {
+      this.windowManager.showRecordingIndicator();
+    });
+
+    ipcMain.handle("hide-recording-indicator", () => {
+      this.windowManager.hideRecordingIndicator();
+    });
+
     ipcMain.handle("set-main-window-interactivity", (event, shouldCapture) => {
       this.windowManager.setMainWindowInteractivity(Boolean(shouldCapture));
       return { success: true };
