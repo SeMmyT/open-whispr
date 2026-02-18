@@ -214,18 +214,47 @@ class ClipboardManager {
     });
   }
 
+  // Detect if the focused window on Windows is a terminal emulator
+  isWindowsTerminal() {
+    try {
+      const result = spawnSync("powershell.exe", [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "(Get-Process | Where-Object {$_.MainWindowHandle -eq (Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow();' -Name W -Namespace W -PassThru)::GetForegroundWindow()}).ProcessName",
+      ]);
+      if (result.status === 0) {
+        const processName = result.stdout.toString().toLowerCase().trim();
+        const terminalProcesses = [
+          "tabby", "windowsterminal", "wezterm-gui", "alacritty",
+          "hyper", "conemu64", "conemu", "mintty", "kitty",
+        ];
+        const isTerminal = terminalProcesses.some((t) => processName.includes(t));
+        if (isTerminal) {
+          this.safeLog(`🖥️ Windows terminal detected: ${processName}`);
+        }
+        return isTerminal;
+      }
+    } catch (error) {
+      // Silent fallback
+    }
+    return false;
+  }
+
   async pasteWindows(originalClipboard) {
+    const useShiftPaste = this.isWindowsTerminal();
+
     // Try nircmd first if available, fallback to PowerShell
     const nircmdPath = this.getNircmdPath();
 
     if (nircmdPath) {
-      return this.pasteWithNircmd(nircmdPath, originalClipboard);
+      return this.pasteWithNircmd(nircmdPath, originalClipboard, useShiftPaste);
     } else {
-      return this.pasteWithPowerShell(originalClipboard);
+      return this.pasteWithPowerShell(originalClipboard, useShiftPaste);
     }
   }
 
-  async pasteWithNircmd(nircmdPath, originalClipboard) {
+  async pasteWithNircmd(nircmdPath, originalClipboard, useShiftPaste = false) {
     return new Promise((resolve, reject) => {
       const pasteDelay = PASTE_DELAYS.win32_nircmd;
       const restoreDelay = RESTORE_DELAYS.win32_nircmd;
@@ -234,9 +263,10 @@ class ClipboardManager {
         let hasTimedOut = false;
         const startTime = Date.now();
 
-        this.safeLog(`⚡ nircmd paste starting (delay: ${pasteDelay}ms)`);
+        const pasteKeys = useShiftPaste ? "ctrl+shift+v" : "ctrl+v";
+        this.safeLog(`⚡ nircmd paste starting (delay: ${pasteDelay}ms, keys: ${pasteKeys})`);
 
-        const pasteProcess = spawn(nircmdPath, ["sendkeypress", "ctrl+v"]);
+        const pasteProcess = spawn(nircmdPath, ["sendkeypress", pasteKeys]);
 
         let errorOutput = "";
 
@@ -265,7 +295,7 @@ class ClipboardManager {
               elapsedMs: elapsed,
               stderr: errorOutput,
             });
-            this.pasteWithPowerShell(originalClipboard).then(resolve).catch(reject);
+            this.pasteWithPowerShell(originalClipboard, useShiftPaste).then(resolve).catch(reject);
           }
         });
 
@@ -277,7 +307,7 @@ class ClipboardManager {
             elapsedMs: elapsed,
             error: error.message,
           });
-          this.pasteWithPowerShell(originalClipboard).then(resolve).catch(reject);
+          this.pasteWithPowerShell(originalClipboard, useShiftPaste).then(resolve).catch(reject);
         });
 
         const timeoutId = setTimeout(() => {
@@ -286,13 +316,13 @@ class ClipboardManager {
           this.safeLog(`⏱️ nircmd timeout, falling back to PowerShell`, { elapsedMs: elapsed });
           killProcess(pasteProcess, "SIGKILL");
           pasteProcess.removeAllListeners();
-          this.pasteWithPowerShell(originalClipboard).then(resolve).catch(reject);
+          this.pasteWithPowerShell(originalClipboard, useShiftPaste).then(resolve).catch(reject);
         }, 2000);
       }, pasteDelay);
     });
   }
 
-  async pasteWithPowerShell(originalClipboard) {
+  async pasteWithPowerShell(originalClipboard, useShiftPaste = false) {
     return new Promise((resolve, reject) => {
       const pasteDelay = PASTE_DELAYS.win32_pwsh;
       const restoreDelay = RESTORE_DELAYS.win32_pwsh;
@@ -301,12 +331,10 @@ class ClipboardManager {
         let hasTimedOut = false;
         const startTime = Date.now();
 
-        this.safeLog(`🪟 PowerShell paste starting (delay: ${pasteDelay}ms)`);
+        // SendKeys syntax: ^ = Ctrl, + = Shift, so ^+v = Ctrl+Shift+V
+        const sendKeysCombo = useShiftPaste ? "^+v" : "^v";
+        this.safeLog(`🪟 PowerShell paste starting (delay: ${pasteDelay}ms, keys: ${useShiftPaste ? "Ctrl+Shift+V" : "Ctrl+V"})`);
 
-        // Optimized PowerShell command:
-        // - Uses [void] to suppress output (faster)
-        // - WindowStyle Hidden to prevent window flash
-        // - ExecutionPolicy Bypass to skip policy checks
         const pasteProcess = spawn("powershell.exe", [
           "-NoProfile",
           "-NonInteractive",
@@ -315,7 +343,7 @@ class ClipboardManager {
           "-ExecutionPolicy",
           "Bypass",
           "-Command",
-          "[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');[System.Windows.Forms.SendKeys]::SendWait('^v')",
+          `[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');[System.Windows.Forms.SendKeys]::SendWait('${sendKeysCombo}')`,
         ]);
 
         let errorOutput = "";
