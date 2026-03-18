@@ -1,10 +1,23 @@
 import type { Command } from "commander";
 import { ModelManager } from "../../core/models/manager.js";
-import { ok, fail, info, warn, table } from "../output.js";
+import { ModelRegistry } from "../../core/models/registry.js";
+import { ok, fail, info } from "../output.js";
 import chalk from "chalk";
 
 export function registerModelsCommand(program: Command): void {
-  const cmd = program.command("models").description("Manage models");
+  const cmd = program
+    .command("models")
+    .description("Manage models")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  $ rw models list          Show whisper models
+  $ rw models list --all    Include local GGUF models
+  $ rw models pull base     Download the base whisper model (74MB)
+  $ rw models pull turbo    Download the turbo model (809MB)
+  $ rw models rm base       Delete the base model`,
+    );
 
   cmd
     .command("list")
@@ -62,12 +75,20 @@ export function registerModelsCommand(program: Command): void {
             `\r  ${bar} ${progress.percent}%`,
           );
         });
-        console.log(); // newline after progress bar
+        console.log();
         ok(`Downloaded to ${destPath}`);
       } catch (err: unknown) {
-        console.log(); // newline after potential progress bar
+        console.log();
         const message = err instanceof Error ? err.message : String(err);
-        fail(message);
+        if (message.includes("Unknown model")) {
+          fail(`Unknown model: ${modelId}`);
+          const registry = new ModelRegistry();
+          const whisperIds = registry.getWhisperModels().map((m) => m.id);
+          info(`Whisper models: ${chalk.cyan(whisperIds.join(", "))}`);
+          info(`See all: ${chalk.cyan("rw models list --all")}`);
+        } else {
+          fail(message);
+        }
         process.exit(1);
       }
     });
@@ -81,6 +102,12 @@ export function registerModelsCommand(program: Command): void {
         ok(`Removed ${modelId}`);
       } else {
         fail(`Model not installed: ${modelId}`);
+        const installed = manager.listInstalled();
+        if (installed.length > 0) {
+          info(`Installed: ${chalk.cyan(installed.map((m) => m.id).join(", "))}`);
+        } else {
+          info("No models are currently installed");
+        }
         process.exit(1);
       }
     });
