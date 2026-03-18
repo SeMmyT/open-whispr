@@ -6,6 +6,8 @@ import { registerStatusCommand } from "./commands/status.js";
 import { registerTranscribeCommand } from "./commands/transcribe.js";
 import { registerModelsCommand } from "./commands/models.js";
 import { registerHistoryCommand } from "./commands/history.js";
+import { registerAgentCommand } from "./commands/agent.js";
+import { registerListenCommand } from "./commands/listen.js";
 
 const program = new Command();
 
@@ -20,5 +22,7 @@ registerStatusCommand(program);
 registerTranscribeCommand(program);
 registerModelsCommand(program);
 registerHistoryCommand(program);
+registerAgentCommand(program);
+registerListenCommand(program);
 
 program.parse();
