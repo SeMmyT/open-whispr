@@ -1,5 +1,5 @@
 const fs = require("fs");
-const path = require("path");
+const _path = require("path");
 
 console.log("Setting up OpenWhispr...");
 
